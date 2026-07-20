@@ -8,7 +8,6 @@ import { getQualityKey, QUALITY_PRESETS } from '../quality.js';
 import { trackVisit, getUnlocked, getDefs } from './achievements.js';
 import { isRealScale, setRealScale } from '../scalemode.js';
 import { t, getLang, toggleLang, applyStaticI18N, bodyName, typeName } from './i18n.js';
-export { selectBody };
 
 let refs, bodyRegistry;
 const raycaster = new THREE.Raycaster();
