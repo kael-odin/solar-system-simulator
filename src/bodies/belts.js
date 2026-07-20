@@ -1,6 +1,7 @@
 // src/bodies/belts.js — 小行星带(300+) + 柯伊伯带 + 命名小行星(Vesta/Pallas)
 import * as THREE from 'three';
 import { NAMED_ASTEROIDS } from '../data/bodies.js';
+import { getQuality } from '../quality.js';
 
 // 不规则小行星：对球体顶点随机扰动
 function makeAsteroidGeo(radius, seed){
@@ -25,8 +26,9 @@ function makeAsteroidMaterial(){
 }
 
 export function createAsteroidBelt(){
+  const Q = getQuality();
   const group = new THREE.Group();
-  const N = 320;
+  const N = Q.asteroidCount;
   const mat = makeAsteroidMaterial();
   const instanced = new THREE.InstancedMesh(makeAsteroidGeo(0.12, 1), mat, N);
   const dummy = new THREE.Object3D();
@@ -88,7 +90,8 @@ export function updateAsteroidBelt(group, t){
 }
 
 export function createKuiperBelt(){
-  const N = 2000;
+  const Q = getQuality();
+  const N = Q.kuiperCount;
   const pos = new Float32Array(N*3);
   const col = new Float32Array(N*3);
   for(let i=0;i<N;i++){

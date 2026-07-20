@@ -1,6 +1,8 @@
 // src/bodies/planet.js — 行星工厂：按 id 选用着色器，统一返回 {group,mesh,data,update}
 import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import { getQuality } from '../quality.js';
+import { applyScaleMode } from '../scalemode.js';
 
 const VERT = /* glsl */`
 varying vec3 vNormal; varying vec3 vObjPos; varying vec3 vWorldPos;
@@ -25,14 +27,24 @@ function lightDirFrom(group){
   return wp.clone().negate().normalize();
 }
 
-// 通用大气壳（菲涅尔）
+// 体积感大气壳：反向法线 + 噪声厚度，比纯菲涅尔更有体积感
 function makeAtmosphere(radius, color, opacity=0.35, power=3.0){
-  const geo = new THREE.SphereGeometry(radius*1.08, 48, 48);
+  const geo = new THREE.SphereGeometry(radius*1.12, 48, 48);
   const mat = new THREE.ShaderMaterial({
-    uniforms:{ uColor:{value:new THREE.Color(color)}, uOpacity:{value:opacity}, uPower:{value:power} },
-    vertexShader:`varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader:`varying vec3 vN; uniform vec3 uColor; uniform float uOpacity; uniform float uPower;
-      void main(){ float r=1.0-max(dot(normalize(vN),vec3(0,0,1)),0.0); float f=pow(r,uPower); gl_FragColor=vec4(uColor,f*uOpacity); }`,
+    uniforms:{ uColor:{value:new THREE.Color(color)}, uOpacity:{value:opacity}, uPower:{value:power}, uTime:{value:0} },
+    vertexShader:`varying vec3 vN; varying vec3 vP;
+      void main(){ vN=normalize(normalMatrix*normal); vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: NOISE_GLSL + `
+      varying vec3 vN; varying vec3 vP; uniform vec3 uColor; uniform float uOpacity; uniform float uPower; uniform float uTime;
+      void main(){
+        float rim = 1.0 - max(dot(normalize(vN), vec3(0,0,1)), 0.0);
+        float f = pow(rim, uPower);
+        // 大气流动：薄云丝缕，边缘更明显
+        vec2 uv = sphereUV(normalize(vP));
+        float flow = fbm2(uv*4.0 + vec2(uTime*0.02, 0.0), 4, 2.0, 0.5);
+        float alpha = f*uOpacity + flow*f*0.25;
+        gl_FragColor = vec4(uColor, alpha);
+      }`,
     transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false,
   });
   return new THREE.Mesh(geo, mat);
@@ -74,22 +86,17 @@ const SHADERS = {
     float n = warpedFbm(uv*3.0);
     float sea = 0.52;
     float isSea = step(n, sea);
-    // 大陆：绿/棕
+    // 大陆：绿/棕，破碎边缘由 warpedFbm 保证
     float biome = fbm2(uv*6.0,4,2.0,0.5);
     vec3 ocean = vec3(0.04,0.18,0.45);
     vec3 land = mix(vec3(0.20,0.45,0.12), vec3(0.45,0.35,0.18), biome);
     vec3 col = mix(land, ocean, isSea);
-    // 云
-    float clouds = fbm2(uv*5.0 + vec2(uTime*0.02,0.0), 5, 2.0, 0.5);
-    clouds = smoothstep(0.5,0.8,clouds);
-    col = mix(col, vec3(0.95), clouds*0.6);
-    // 海洋镜面高光
+    // 海洋镜面高光（阳光海面闪烁）
     float spec = 0.0;
     if(isSea>0.5){
-      vec3 R = reflect(-normalize(uLightDir), normalize(vNormal));
-      spec = pow(max(R.z,0.0), 60.0)*0.6*clouds*0.0 + pow(max(dot(normalize(vNormal),normalize(uLightDir)),0.0),80.0)*0.5;
+      spec = pow(max(dot(normalize(vNormal),normalize(uLightDir)),0.0),80.0)*0.6;
     }
-    // 夜灯
+    // 夜灯（夜面城市灯光）
     float night = 1.0 - term(vNormal, uLightDir);
     if(isSea<0.5){
       float city = step(0.6, fbm2(uv*12.0,4,2.0,0.5));
@@ -205,15 +212,21 @@ const ATMOSPHERES = {
 };
 
 export function createPlanet(data){
+  data = applyScaleMode(data);
   const group = new THREE.Group();
   const r = data.renderRadius;
   const frag = SHADERS[data.id];
+  const seg = getQuality().sphereSeg;
   const mat = new THREE.ShaderMaterial({
     uniforms:{ uTime:{value:0}, uLightDir:{value:new THREE.Vector3(1,0,0)}, uBrightness:{value:1.0} },
     vertexShader: VERT, fragmentShader: NOISE_GLSL + HEAD + frag,
   });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 64), mat);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, seg, seg), mat);
   mesh.userData.bodyId = data.id;
+  const Q = getQuality();
+  if(Q.shadows){
+    mesh.castShadow = true; mesh.receiveShadow = true;
+  }
   // 天王星 98° 倾角
   if(data.axialTilt) mesh.rotation.z = data.axialTilt;
   group.add(mesh);
@@ -223,6 +236,28 @@ export function createPlanet(data){
   if(atm){
     atmosphere = makeAtmosphere(r, atm.color, atm.opacity, atm.power);
     group.add(atmosphere);
+  }
+
+  // 地球：独立云层球壳，慢速旋转飘过地表
+  let cloudMesh = null;
+  if(data.id==='earth'){
+    const cloudMat = new THREE.ShaderMaterial({
+      uniforms:{ uTime:{value:0}, uLightDir:{value:new THREE.Vector3(1,0,0)}, uBrightness:{value:1.0} },
+      vertexShader: VERT,
+      fragmentShader: NOISE_GLSL + HEAD + `
+        void main(){
+          vec2 uv = sphereUV(normalize(vObjPos));
+          float c = fbm2(uv*5.0 + vec2(uTime*0.03, uTime*0.01), 6, 2.0, 0.55);
+          c = smoothstep(0.48, 0.82, c);
+          float L = term(vNormal, uLightDir);
+          // 云在夜面变暗但仍可见微光
+          vec3 col = vec3(0.95) * (0.25 + L*0.85);
+          gl_FragColor = vec4(col*uBrightness, c*0.85);
+        }`,
+      transparent:true, depthWrite:false,
+    });
+    cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(r*1.02, seg, seg), cloudMat);
+    group.add(cloudMesh);
   }
 
   // 天王星细环
@@ -239,11 +274,26 @@ export function createPlanet(data){
     const ring = new THREE.Mesh(ringGeo, ringMat); ring.rotation.x = Math.PI/2;
     group.add(ring);
   }
+  // 土星环阴影：在土星表面投下的暗化环（ShaderMaterial 无法 receiveShadow 的务实替代）
+  if(data.id==='saturn'){
+    const shadowGeo = new THREE.RingGeometry(r*1.4, r*2.4, 96);
+    const shadowMat = new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.35, side:THREE.DoubleSide, blending:THREE.MultiplyBlending, depthWrite:false });
+    const shadowRing = new THREE.Mesh(shadowGeo, shadowMat);
+    shadowRing.rotation.x = Math.PI/2 - 0.15;
+    shadowRing.position.y = 0.01; // 略浮于土星表面
+    group.add(shadowRing);
+  }
 
   return {
     group, mesh, data, atmosphere,
     update(t, dt){
       mat.uniforms.uTime.value = t;
+      if(atmosphere) atmosphere.material.uniforms.uTime.value = t;
+      if(cloudMesh){
+        cloudMesh.material.uniforms.uTime.value = t;
+        cloudMesh.rotation.y = t * 0.04; // 云独立慢转
+        cloudMesh.material.uniforms.uLightDir.value.copy(mat.uniforms.uLightDir.value);
+      }
       const ld = lightDirFrom(group);
       mat.uniforms.uLightDir.value.copy(ld);
     },

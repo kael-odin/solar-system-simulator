@@ -1,6 +1,11 @@
 // src/bodies/sun.js — 太阳：沸腾等离子体 + 3层光晕 + 黑子 + 太阳风粒子
 import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import { getQuality } from '../quality.js';
+
+// 镜头引用，由 main.js 注入，用于光晕朝向衰减
+let _camera = null;
+export function setSunCamera(cam){ _camera = cam; }
 
 const VERT = /* glsl */`
 varying vec3 vNormal; varying vec3 vObjPos;
@@ -53,6 +58,31 @@ void main(){
   gl_FragColor = vec4(col * uBrightness, 1.0);
 }
 `;
+
+// 镜头光晕纹理：十字光芒 + 中心辉光
+function makeFlareTexture(){
+  const s = 256, c = document.createElement('canvas'); c.width=c.height=s;
+  const ctx = c.getContext('2d');
+  const cx=s/2, cy=s/2;
+  // 中心辉光
+  const g = ctx.createRadialGradient(cx,cy,0,cx,cy,s*0.18);
+  g.addColorStop(0,'rgba(255,240,200,0.9)');
+  g.addColorStop(1,'rgba(255,200,120,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,s,s);
+  // 十字光芒
+  ctx.globalCompositeOperation='lighter';
+  for(const [dx,dy] of [[1,0],[0,1],[1,1],[1,-1]]){
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.atan2(dy,dx));
+    const grad = ctx.createLinearGradient(-s*0.5,0,s*0.5,0);
+    grad.addColorStop(0,'rgba(255,220,150,0)');
+    grad.addColorStop(0.5,'rgba(255,235,180,0.5)');
+    grad.addColorStop(1,'rgba(255,220,150,0)');
+    ctx.fillStyle=grad; ctx.fillRect(-s*0.5,-1.5,s,3);
+    ctx.restore();
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 // 光晕 Sprite 纹理（程序化径向渐变）
 function makeGlowTexture(){
@@ -114,7 +144,7 @@ export function createSun(){
     uniforms: { uTime:{value:0}, uBrightness:{value:1.0} },
     vertexShader: VERT, fragmentShader: NOISE_GLSL + FRAG,
   });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 64), mat);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, getQuality().sphereSeg, getQuality().sphereSeg), mat);
   mesh.userData.bodyId = 'sun';
   group.add(mesh);
 
@@ -130,10 +160,41 @@ export function createSun(){
 
   const wind = makeSolarWind(); group.add(wind);
 
+  // 体积感日冕：反向法线半透明球壳，任意角度有厚度
+  const coronaGeo = new THREE.SphereGeometry(radius*1.35, 48, 48);
+  const coronaMat = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0}, uBrightness:{value:1.0} },
+    vertexShader:`varying vec3 vN; varying vec3 vP;
+      void main(){ vN=normalize(normalMatrix*normal); vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: NOISE_GLSL + `
+      varying vec3 vN; varying vec3 vP; uniform float uTime; uniform float uBrightness;
+      void main(){
+        float rim = 1.0 - max(dot(normalize(vN), vec3(0,0,1)), 0.0);
+        float f = pow(rim, 2.2);
+        // 日冕丝缕：沿球面流动的噪声
+        vec2 uv = sphereUV(normalize(vP));
+        float strands = fbm2(uv*6.0 + vec2(uTime*0.05, -uTime*0.03), 5, 2.0, 0.55);
+        strands = pow(strands, 1.5);
+        vec3 col = mix(vec3(1.0,0.55,0.15), vec3(1.0,0.85,0.5), strands);
+        float alpha = f*0.55 + strands*f*0.4;
+        gl_FragColor = vec4(col*uBrightness, alpha);
+      }`,
+    transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false,
+  });
+  const corona = new THREE.Mesh(coronaGeo, coronaMat);
+  group.add(corona);
+
+  // 镜头光晕：十字光芒 sprite（程序化纹理）
+  const flareTex = makeFlareTexture();
+  const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map:flareTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.6 }));
+  flare.scale.set(radius*10, radius*10, 1);
+  group.add(flare);
+
   return {
     group, mesh, data:{ renderRadius:radius, id:'sun' },
     update(t, dt){
       mat.uniforms.uTime.value = t;
+      coronaMat.uniforms.uTime.value = t;
       // 粒子向外飘散 + 循环
       const ud = wind.userData; const p = ud.pos; const L = ud.life;
       for(let i=0;i<ud.N;i++){
@@ -148,6 +209,16 @@ export function createSun(){
       // 光晕微脉动
       const pulse = 1 + Math.sin(t*0.5)*0.03;
       inner.scale.set(radius*4*pulse, radius*4*pulse,1);
+      // 镜头光晕：相机越正对太阳越亮
+      if(_camera){
+        const sunPos = new THREE.Vector3(); group.getWorldPosition(sunPos);
+        const dir = sunPos.clone().sub(_camera.position).normalize();
+        const camFwd = new THREE.Vector3(); _camera.getWorldDirection(camFwd);
+        const facing = Math.max(0, dir.dot(camFwd));
+        flare.material.opacity = 0.15 + facing*facing*0.7;
+        const fs = radius*(8 + facing*4);
+        flare.scale.set(fs,fs,1);
+      }
     },
   };
 }

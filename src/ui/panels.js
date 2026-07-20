@@ -4,6 +4,10 @@ import { STATE } from '../main.js';
 import { searchBodies, findBody } from '../data/bodies.js';
 import { initCameraRefs, focusTarget, gotoPreset } from './camera.js';
 import { updateCamera } from './camera.js';
+import { getQualityKey, QUALITY_PRESETS } from '../quality.js';
+import { trackVisit, getUnlocked, getDefs } from './achievements.js';
+import { isRealScale, setRealScale } from '../scalemode.js';
+export { selectBody };
 
 let refs, bodyRegistry;
 const raycaster = new THREE.Raycaster();
@@ -13,8 +17,9 @@ function infoDefault(){
   document.getElementById('info-name').textContent = '太阳系';
   document.getElementById('info-en').textContent = 'Solar System';
   document.getElementById('info-type').textContent = '系统';
+  const unlocked = getUnlocked().length, total = getDefs().length;
   document.getElementById('info-body').innerHTML =
-    '<div class="hint">单击任意天体查看详情；双击聚焦飞行；拖拽旋转，滚轮缩放，右键平移。</div>';
+    '<div class="hint">单击任意天体查看详情；双击聚焦飞行；拖拽旋转，滚轮缩放，右键平移。<br>Tab/方向键切换天体，Enter 聚焦。<br><br>🏆 成就 '+unlocked+'/'+total+'</div>';
 }
 
 function showInfo(body){
@@ -37,8 +42,9 @@ function showInfo(body){
   document.getElementById('info-body').innerHTML = html + '<style>@keyframes rowin{to{opacity:1;transform:none}}</style>';
 }
 
-function selectBody(id){
+export function selectBody(id){
   STATE.selected = id;
+  trackVisit(id);
   document.querySelectorAll('.body-label').forEach(el=>el.classList.remove('selected'));
   const labelObj = refs.labelObjects.find(l=>l.id===id);
   if(labelObj) labelObj.el.classList.add('selected');
@@ -144,6 +150,18 @@ function setupControls(){
   // 预设
   document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>gotoPreset(b.dataset.preset)));
   document.getElementById('reset-view').addEventListener('click', ()=>gotoPreset('overview'));
+  // 质量档位切换（需重建几何，故 reload）
+  document.querySelectorAll('[data-quality]').forEach(b=>b.addEventListener('click', ()=>{
+    const k=b.dataset.quality;
+    try{ localStorage.setItem('ssim-quality', k); }catch(e){}
+    location.reload();
+  }));
+  // 真实尺度切换
+  const realToggle = document.querySelector('[data-toggle-real]');
+  if(realToggle){
+    if(isRealScale()) realToggle.classList.add('on');
+    realToggle.addEventListener('click', ()=>{ setRealScale(!isRealScale()); location.reload(); });
+  }
 }
 
 function applyVisibility(){
@@ -166,6 +184,13 @@ export function initUI(_refs){
   initCameraRefs(_refs);
   setupSearch(); setupControls();
   infoDefault();
+  // 高亮当前质量档
+  const qk = getQualityKey();
+  document.querySelectorAll('[data-quality]').forEach(b=>b.classList.toggle('active', b.dataset.quality===qk));
+  // 移动端控制面板抽屉切换
+  const toggle = document.getElementById('panel-toggle');
+  const cp = document.getElementById('control-panel');
+  if(toggle && cp){ toggle.addEventListener('click', ()=> cp.classList.toggle('open')); }
   // 注册主指针事件
   const canvas = document.getElementById('scene');
   canvas.addEventListener('pointerdown', onPointerDown);

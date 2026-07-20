@@ -1,6 +1,8 @@
 // src/bodies/moon.js — 月球与各卫星着色器工厂
 import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import { getQuality } from '../quality.js';
+import { applyScaleMode } from '../scalemode.js';
 
 const VERT = /* glsl */`
 varying vec3 vNormal; varying vec3 vObjPos;
@@ -146,18 +148,26 @@ const SHADERS = {
 };
 
 function makeAtmosphere(radius, color, opacity=0.35, power=3.0){
-  const geo = new THREE.SphereGeometry(radius*1.08, 32, 32);
+  const geo = new THREE.SphereGeometry(radius*1.12, 32, 32);
   const mat = new THREE.ShaderMaterial({
-    uniforms:{ uColor:{value:new THREE.Color(color)}, uOpacity:{value:opacity}, uPower:{value:power} },
-    vertexShader:`varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader:`varying vec3 vN; uniform vec3 uColor; uniform float uOpacity; uniform float uPower;
-      void main(){ float r=1.0-max(dot(normalize(vN),vec3(0,0,1)),0.0); float f=pow(r,uPower); gl_FragColor=vec4(uColor,f*uOpacity); }`,
+    uniforms:{ uColor:{value:new THREE.Color(color)}, uOpacity:{value:opacity}, uPower:{value:power}, uTime:{value:0} },
+    vertexShader:`varying vec3 vN; varying vec3 vP;
+      void main(){ vN=normalize(normalMatrix*normal); vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: NOISE_GLSL + `
+      varying vec3 vN; varying vec3 vP; uniform vec3 uColor; uniform float uOpacity; uniform float uPower; uniform float uTime;
+      void main(){
+        float rim=1.0-max(dot(normalize(vN),vec3(0,0,1)),0.0); float f=pow(rim,uPower);
+        vec2 uv=sphereUV(normalize(vP));
+        float flow=fbm2(uv*4.0+vec2(uTime*0.02,0.0),4,2.0,0.5);
+        gl_FragColor=vec4(uColor, f*uOpacity + flow*f*0.25);
+      }`,
     transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false,
   });
   return new THREE.Mesh(geo, mat);
 }
 
 export function createMoon(data){
+  data = applyScaleMode(data);
   const group = new THREE.Group();
   const r = data.renderRadius;
   const frag = SHADERS[data.id] || SHADERS.callisto;
@@ -165,8 +175,10 @@ export function createMoon(data){
     uniforms:{ uTime:{value:0}, uLightDir:{value:new THREE.Vector3(1,0,0)}, uBrightness:{value:1.0} },
     vertexShader: VERT, fragmentShader: NOISE_GLSL + HEAD + frag,
   });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 48), mat);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, getQuality().moonSeg, getQuality().moonSeg), mat);
   mesh.userData.bodyId = data.id;
+  const Q = getQuality();
+  if(Q.shadows){ mesh.castShadow = true; mesh.receiveShadow = true; }
   group.add(mesh);
 
   let atmosphere = null;
@@ -176,6 +188,7 @@ export function createMoon(data){
     group, mesh, data, atmosphere,
     update(t, dt){
       mat.uniforms.uTime.value = t;
+      if(atmosphere) atmosphere.material.uniforms.uTime.value = t;
       mat.uniforms.uLightDir.value.copy(lightDirFrom(group));
     },
   };

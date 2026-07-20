@@ -85,6 +85,19 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   #loading .txt{color:var(--text-dim);font-size:13px}
   #fps{position:fixed;bottom:8px;left:10px;font-size:10px;color:rgba(140,160,200,0.5);z-index:10;font-variant-numeric:tabular-nums}
+  #date-display{position:fixed;bottom:8px;right:14px;font-size:13px;color:rgba(180,200,240,0.75);z-index:10;font-variant-numeric:tabular-nums;letter-spacing:1px;text-shadow:0 0 6px rgba(0,0,0,0.8)}
+  /* 移动端响应式 */
+  #panel-toggle{display:none;position:fixed;bottom:14px;right:14px;z-index:18;width:44px;height:44px;border-radius:50%;
+    background:var(--glass-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid var(--glass-border);color:var(--text);font-size:20px;cursor:pointer;align-items:center;justify-content:center}
+  @media (max-width:680px){
+    #info-panel{left:8px;right:8px;width:auto;max-height:38vh;top:60px}
+    #control-panel{top:auto;bottom:70px;right:8px;left:8px;width:auto;max-height:50vh;overflow-y:auto;display:none}
+    #control-panel.open{display:block}
+    #panel-toggle{display:flex}
+    #searchbar{width:calc(100vw - 20px);top:8px}
+    #date-display{font-size:11px}
+  }
 </style>
 </head>
 <body>
@@ -141,9 +154,19 @@
       <button class="btn full" data-preset="pluto">冥王星特写</button>
       <button class="btn full" id="reset-view">重置视角</button>
     </div>
+
+    <h3 style="margin-top:12px">质量</h3>
+    <div class="seg" id="quality-seg">
+      <button data-quality="performance">性能</button>
+      <button data-quality="balanced">平衡</button>
+      <button data-quality="quality">质量</button>
+    </div>
+    <div class="ctrl-row" style="margin-top:10px"><label>真实尺度(对数)</label><div class="toggle" data-toggle-real="1"></div></div>
   </aside>
 
   <div id="fps">FPS: --</div>
+  <div id="date-display">2026-07-20</div>
+  <button id="panel-toggle">⚙</button>
 
   <div id="loading">
     <div class="spinner"></div>

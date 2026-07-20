@@ -1,6 +1,8 @@
 // src/bodies/dwarf.js — 冥王星(汤博区爱心) + 其他矮行星
 import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import { getQuality } from '../quality.js';
+import { applyScaleMode } from '../scalemode.js';
 
 const VERT = /* glsl */`
 varying vec3 vNormal; varying vec3 vObjPos;
@@ -140,6 +142,7 @@ const SHADERS = {
 };
 
 export function createDwarf(data){
+  data = applyScaleMode(data);
   const group = new THREE.Group();
   const r = data.renderRadius;
   const frag = SHADERS[data.id];
@@ -147,11 +150,13 @@ export function createDwarf(data){
     uniforms:{ uTime:{value:0}, uLightDir:{value:new THREE.Vector3(1,0,0)}, uBrightness:{value:1.0} },
     vertexShader: VERT, fragmentShader: NOISE_GLSL + HEAD + frag,
   });
-  let geo = new THREE.SphereGeometry(r, 48, 48);
+  let geo = new THREE.SphereGeometry(r, getQuality().moonSeg, getQuality().moonSeg);
   // 妊神星：拉长椭球
   if(data.ellipsoid) geo.scale(2.0, 1.0, 1.0);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.userData.bodyId = data.id;
+  const Q = getQuality();
+  if(Q.shadows){ mesh.castShadow = true; mesh.receiveShadow = true; }
   group.add(mesh);
 
   return {

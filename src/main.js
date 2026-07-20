@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'addons/postprocessing/UnrealBloomPass.js';
 import { CSS2DRenderer, CSS2DObject } from 'addons/renderers/CSS2DRenderer.js';
 import { OrbitControls } from 'addons/controls/OrbitControls.js';
 
-import { createSun } from './bodies/sun.js';
+import { createSun, setSunCamera } from './bodies/sun.js';
 import { createPlanet } from './bodies/planet.js';
 import { createMoon } from './bodies/moon.js';
 import { createDwarf } from './bodies/dwarf.js';
@@ -14,8 +14,10 @@ import { createSaturnRings } from './bodies/saturnRings.js';
 import { createAsteroidBelt, createKuiperBelt, createOortCloud, updateAsteroidBelt, updateKuiperBelt } from './bodies/belts.js';
 import { createBackground } from './bodies/background.js';
 import { SUN, PLANETS, DWARFS, MOONS, NAMED_ASTEROIDS } from './data/bodies.js';
-import { initUI } from './ui/panels.js';
+import { initUI, selectBody } from './ui/panels.js';
 import { focusTarget, updateCamera } from './ui/camera.js';
+import { getQuality, getQualityKey, setQualityKey, QUALITY_PRESETS } from './quality.js';
+import { makeEllipseOrbit, bodyWorldPos } from './orbit.js';
 
 // ---- 全局状态 ----
 export const STATE = {
@@ -26,14 +28,17 @@ export const STATE = {
   show: { asteroids:true, kuiper:true, orbits:true, labels:true, atmospheres:true },
   selected: null,
   simTime: 0,
+  reducedMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 };
 
 const canvas = document.getElementById('scene');
+const Q = getQuality();
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, Q.pixelRatioCap));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+if(Q.shadows){ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 20000);
@@ -61,13 +66,15 @@ document.getElementById('labels').appendChild(labelRenderer.domElement);
 // ---- 后期：Bloom ----
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1, 0.6, 0.25);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), Q.bloomStrength, 0.6, 0.25);
+bloom.setSize(innerWidth*Q.bloomScale, innerHeight*Q.bloomScale);
 composer.addPass(bloom);
 
 // ---- 环境光 ----
 const ambient = new THREE.AmbientLight(0x223344, 0.25);
 scene.add(ambient);
 const sunLight = new THREE.PointLight(0xffeedd, 3.0, 0, 1.5); sunLight.position.set(0,0,0);
+if(Q.shadows){ sunLight.castShadow = true; sunLight.shadow.mapSize.set(Q.shadowMapSize, Q.shadowMapSize); sunLight.shadow.camera.near = 0.5; sunLight.shadow.camera.far = 200; sunLight.shadow.bias = -0.0005; }
 scene.add(sunLight);
 
 // ---- 容器 ----
@@ -101,13 +108,14 @@ function makeOrbit(radius){
 
 // ---- 构建天体 ----
 const sun = createSun(); bodyGroup.add(sun.group); bodyRegistry.set('sun', sun); addLabel('太阳', sun.group, 'sun');
+setSunCamera(camera);
 
 const planetObjs = {};
 for(const p of PLANETS){
   const po = createPlanet(p); bodyGroup.add(po.group);
   bodyRegistry.set(p.id, po); planetObjs[p.id]=po;
   addLabel(p.name, po.group, p.id);
-  const orbit = makeOrbit(p.orbitRadius); orbitGroup.add(orbit); po.orbitLine = orbit;
+  const orbit = makeEllipseOrbit(p); orbitGroup.add(orbit); po.orbitLine = orbit;
   if(p.id==='saturn'){ const rings = createSaturnRings(3.8); po.group.add(rings); }
 }
 
@@ -122,11 +130,11 @@ for(const m of MOONS){
 
 const dwarfObjs = {};
 for(const d of DWARFS){
-  if(d.id==='pluto'){ const po = createDwarf(d); bodyGroup.add(po.group); bodyRegistry.set('pluto', po); addLabel('冥王星', po.group, 'pluto'); const o=makeOrbit(d.orbitRadius); orbitGroup.add(o); po.orbitLine=o; dwarfObjs['pluto']=po; continue; }
+  if(d.id==='pluto'){ const po = createDwarf(d); bodyGroup.add(po.group); bodyRegistry.set('pluto', po); addLabel('冥王星', po.group, 'pluto'); const o=makeEllipseOrbit(d); orbitGroup.add(o); po.orbitLine=o; dwarfObjs['pluto']=po; continue; }
   const dobj = createDwarf(d); bodyGroup.add(dobj.group);
   bodyRegistry.set(d.id, dobj); dwarfObjs[d.id]=dobj;
   addLabel(d.name, dobj.group, d.id);
-  if(!d.inBelt){ const o=makeOrbit(d.orbitRadius); orbitGroup.add(o); dobj.orbitLine=o; }
+  if(!d.inBelt){ const o=makeEllipseOrbit(d); orbitGroup.add(o); dobj.orbitLine=o; }
 }
 
 const belts = createAsteroidBelt(); beltGroup.add(belts);
@@ -148,14 +156,23 @@ const oort = createOortCloud(); scene.add(oort);
 }
 
 const bg = createBackground(); scene.add(bg.group);
+if(STATE.reducedMotion){
+  STATE.timeScale = 0; // 默认暂停
+  const ts=document.getElementById('time-slider'); if(ts) ts.value=0;
+  const tv=document.getElementById('time-val'); if(tv) tv.textContent='0×';
+}
 
 // ---- UI ----
 initUI({ camera, controls, scene, bodyRegistry, bloom, ambient, bg, labelObjects });
+window.__selectBody = selectBody;
 
 // ---- 渲染循环 ----
 const clock = new THREE.Clock();
 let fpsAcc=0, fpsCount=0, fpsLast=performance.now();
 const fpsEl = document.getElementById('fps');
+const dateEl = document.getElementById('date-display');
+const EPOCH = new Date('2026-07-20T00:00:00');
+let simDays = 0; // 累计模拟天数
 
 function animate(){
   requestAnimationFrame(animate);
@@ -164,11 +181,11 @@ function animate(){
   const t = STATE.simTime;
   updateCamera(dt);
 
-  // 行星轨道运动
+  // 行星轨道运动（真实椭圆 + 倾角）
   for(const p of PLANETS){
     const po = planetObjs[p.id]; if(!po) continue;
-    const a = t * p.orbitSpeed * 0.05;
-    po.group.position.set(Math.cos(a)*p.orbitRadius, 0, Math.sin(a)*p.orbitRadius);
+    const M = t * p.orbitSpeed * 0.05;
+    po.group.position.copy(bodyWorldPos(p, M));
     if(po.mesh) po.mesh.rotation.y = t * p.rotSpeed * 0.3;
     if(po.atmosphere) po.atmosphere.rotation.y = t * p.rotSpeed * 0.25;
     if(po.update) po.update(t, dt);
@@ -182,11 +199,11 @@ function animate(){
     if(mo.mesh) mo.mesh.rotation.y = t * m.rotSpeed * 0.3;
     if(mo.update) mo.update(t, dt);
   }
-  // 矮行星轨道（ceres 虽在小行星带内，但独立轨道运行，仅不画轨道线）
+  // 矮行星轨道（真实椭圆 + 倾角；冥王星 17° 倾角最显著）
   for(const d of DWARFS){
     const dobj = dwarfObjs[d.id]; if(!dobj) continue;
-    const a = t * d.orbitSpeed * 0.05;
-    dobj.group.position.set(Math.cos(a)*d.orbitRadius, 0, Math.sin(a)*d.orbitRadius);
+    const M = t * d.orbitSpeed * 0.05;
+    dobj.group.position.copy(bodyWorldPos(d, M));
     if(dobj.mesh) dobj.mesh.rotation.y = t * d.rotSpeed * 0.3;
     if(dobj.update) dobj.update(t, dt);
   }
@@ -209,13 +226,20 @@ function animate(){
   composer.render();
   labelRenderer.render(scene, camera);
 
-  // fps
+  // fps + 日期
   const now = performance.now();
   fpsCount++; fpsAcc += dt;
   if(now - fpsLast > 500){
     const fps = Math.round(fpsCount/( (now-fpsLast)/1000 ));
     fpsEl.textContent = 'FPS: '+fps;
     fpsCount=0; fpsLast=now;
+  }
+  // 日期推进：1x 倍率约等于每秒 7 天（一年看约 5 分钟），倍率 0 停
+  simDays += dt * STATE.timeScale * 7;
+  if(dateEl){
+    const d = new Date(EPOCH.getTime() + simDays*86400000);
+    const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), dd=String(d.getUTCDate()).padStart(2,'0');
+    dateEl.textContent = `${y}-${m}-${dd}`;
   }
 }
 
@@ -231,3 +255,18 @@ addEventListener('resize', ()=>{
 document.getElementById('loading').style.display='none';
 animate();
 console.log('%c🌌 太阳系模拟器已启动', 'color:#6fb6ff;font-size:14px');
+
+// 键盘导航：Tab/方向键遍历天体，Enter 聚焦
+import('./ui/camera.js').then(({ focusTarget })=>{ window.__focusTarget=focusTarget; });
+const NAV_ORDER = ['sun', ...PLANETS.map(p=>p.id), ...MOONS.map(m=>m.id), ...DWARFS.map(d=>d.id)];
+let navIndex = 0;
+addEventListener('keydown', (e)=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='Tab'){ e.preventDefault(); navIndex = (navIndex + (e.shiftKey?-1:1) + NAV_ORDER.length) % NAV_ORDER.length; selectBodyExternal(NAV_ORDER[navIndex]); }
+  else if(e.key==='Enter'){ window.__focusTarget && window.__focusTarget(NAV_ORDER[navIndex]); }
+  else if(e.key==='ArrowRight'){ navIndex=(navIndex+1)%NAV_ORDER.length; selectBodyExternal(NAV_ORDER[navIndex]); }
+  else if(e.key==='ArrowLeft'){ navIndex=(navIndex-1+NAV_ORDER.length)%NAV_ORDER.length; selectBodyExternal(NAV_ORDER[navIndex]); }
+});
+function selectBodyExternal(id){
+  if(window.__selectBody) window.__selectBody(id);
+}

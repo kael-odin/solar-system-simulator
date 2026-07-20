@@ -1,6 +1,7 @@
 // src/bodies/background.js — 深空背景：星点着色器 + 渐变天球 + 流星 + 奥尔特云
 import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import { getQuality } from '../quality.js';
 
 // 深蓝紫渐变天球
 function makeSkyDome(){
@@ -112,8 +113,8 @@ function makeMeteors(){
 }
 
 // 奥尔特云：极远处稀疏粒子
-function makeOort(){
-  const N=1500;
+function makeOort(count=1500){
+  const N=count;
   const pos=new Float32Array(N*3);
   for(let i=0;i<N;i++){
     const u=Math.random()*Math.PI*2, v=Math.acos(2*Math.random()-1);
@@ -129,11 +130,13 @@ function makeOort(){
 }
 
 export function createBackground(){
+  const Q = getQuality();
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const group = new THREE.Group();
   const sky = makeSkyDome(); group.add(sky);
-  const stars = makeStarfield(8000); group.add(stars);
-  const meteors = makeMeteors(); group.add(meteors.group);
-  const oort = makeOort(); group.add(oort);
+  const stars = makeStarfield(Q.starCount); group.add(stars);
+  const meteors = makeMeteors(); if(!reduced) group.add(meteors.group);
+  const oort = makeOort(Q.oortCount); group.add(oort);
 
   return {
     group,
