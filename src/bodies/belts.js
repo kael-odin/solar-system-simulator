@@ -106,8 +106,28 @@ export function createKuiperBelt(){
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  const m=new THREE.PointsMaterial({ size:0.6, vertexColors:true, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false });
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  const m=new THREE.ShaderMaterial({
+    uniforms:{ uPixelRatio:{value:Math.min(window.devicePixelRatio,2)} },
+    vertexShader:`
+      attribute vec3 aColor; uniform float uPixelRatio;
+      varying vec3 vColor;
+      void main(){
+        vColor=aColor;
+        vec4 mv=modelViewMatrix*vec4(position,1.0);
+        gl_PointSize=4.0*uPixelRatio*(300.0/-mv.z);
+        gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      varying vec3 vColor;
+      void main(){
+        vec2 d=gl_PointCoord-0.5;
+        float r=length(d);
+        float a=smoothstep(0.5,0.0,r); a*=a;
+        gl_FragColor=vec4(vColor, a*0.7);
+      }`,
+    transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
+  });
   const pts = new THREE.Points(g,m);
   pts.userData = { N, pos, basePos: pos.slice() };
   return pts;

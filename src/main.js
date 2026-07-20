@@ -13,11 +13,12 @@ import { createDwarf } from './bodies/dwarf.js';
 import { createSaturnRings } from './bodies/saturnRings.js';
 import { createAsteroidBelt, createKuiperBelt, createOortCloud, updateAsteroidBelt, updateKuiperBelt } from './bodies/belts.js';
 import { createBackground } from './bodies/background.js';
-import { SUN, PLANETS, DWARFS, MOONS, NAMED_ASTEROIDS } from './data/bodies.js';
+import { SUN, PLANETS, DWARFS, MOONS, NAMED_ASTEROIDS, findBody } from './data/bodies.js';
 import { initUI, selectBody } from './ui/panels.js';
 import { focusTarget, updateCamera } from './ui/camera.js';
 import { getQuality, getQualityKey, setQualityKey, QUALITY_PRESETS } from './quality.js';
 import { makeEllipseOrbit, bodyWorldPos } from './orbit.js';
+import { bodyName } from './ui/i18n.js';
 
 // ---- 全局状态 ----
 export const STATE = {
@@ -107,14 +108,14 @@ function makeOrbit(radius){
 }
 
 // ---- 构建天体 ----
-const sun = createSun(); bodyGroup.add(sun.group); bodyRegistry.set('sun', sun); addLabel('太阳', sun.group, 'sun');
+const sun = createSun(); bodyGroup.add(sun.group); bodyRegistry.set('sun', sun); addLabel(bodyName(findBody('sun')), sun.group, 'sun');
 setSunCamera(camera);
 
 const planetObjs = {};
 for(const p of PLANETS){
   const po = createPlanet(p); bodyGroup.add(po.group);
   bodyRegistry.set(p.id, po); planetObjs[p.id]=po;
-  addLabel(p.name, po.group, p.id);
+  addLabel(bodyName(p), po.group, p.id);
   const orbit = makeEllipseOrbit(p); orbitGroup.add(orbit); po.orbitLine = orbit;
   if(p.id==='saturn'){ const rings = createSaturnRings(3.8); po.group.add(rings); }
 }
@@ -125,15 +126,15 @@ for(const m of MOONS){
   if(!parent) continue;
   const mo = createMoon(m); parent.group.add(mo.group);
   bodyRegistry.set(m.id, mo); moonObjs[m.id]=mo;
-  addLabel(m.name, mo.group, m.id);
+  addLabel(bodyName(m), mo.group, m.id);
 }
 
 const dwarfObjs = {};
 for(const d of DWARFS){
-  if(d.id==='pluto'){ const po = createDwarf(d); bodyGroup.add(po.group); bodyRegistry.set('pluto', po); addLabel('冥王星', po.group, 'pluto'); const o=makeEllipseOrbit(d); orbitGroup.add(o); po.orbitLine=o; dwarfObjs['pluto']=po; continue; }
+  if(d.id==='pluto'){ const po = createDwarf(d); bodyGroup.add(po.group); bodyRegistry.set('pluto', po); addLabel(bodyName(d), po.group, 'pluto'); const o=makeEllipseOrbit(d); orbitGroup.add(o); po.orbitLine=o; dwarfObjs['pluto']=po; continue; }
   const dobj = createDwarf(d); bodyGroup.add(dobj.group);
   bodyRegistry.set(d.id, dobj); dwarfObjs[d.id]=dobj;
-  addLabel(d.name, dobj.group, d.id);
+  addLabel(bodyName(d), dobj.group, d.id);
   if(!d.inBelt){ const o=makeEllipseOrbit(d); orbitGroup.add(o); dobj.orbitLine=o; }
 }
 
@@ -151,7 +152,7 @@ const oort = createOortCloud(); scene.add(oort);
       group: mesh, mesh, data:{ ...na, renderRadius: na.id==='vesta'?0.9:0.5 },
       update(){}
     });
-    addLabel(na.name, mesh, na.id);
+    addLabel(bodyName(na), mesh, na.id);
   }
 }
 

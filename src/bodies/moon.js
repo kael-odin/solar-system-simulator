@@ -145,6 +145,50 @@ const SHADERS = {
     col *= 0.1 + L*0.9;
     gl_FragColor=vec4(col*uBrightness,1.0);
   }`,
+
+  phobos: /* glsl */`
+  void main(){
+    vec2 uv = sphereUV(normalize(vObjPos));
+    float c = craters(uv, 18.0);
+    float n = fbm2(uv*3.0,4,2.0,0.5);
+    // 火卫一 Stickney 大坑
+    vec3 sp = normalize(vObjPos);
+    float d = length(vec2(sp.x-0.3, sp.y*1.1));
+    float stickney = smoothstep(0.22,0.08,d);
+    vec3 col = vec3(0.42,0.36,0.30) * (0.6+c*0.6+n*0.2);
+    col = mix(col, vec3(0.25,0.22,0.18), stickney*0.7);
+    float L = term(vNormal, uLightDir);
+    col *= 0.06 + L*0.92;
+    gl_FragColor=vec4(col*uBrightness,1.0);
+  }`,
+
+  deimos: /* glsl */`
+  void main(){
+    vec2 uv = sphereUV(normalize(vObjPos));
+    float c = craters(uv, 16.0);
+    float n = fbm2(uv*4.0,3,2.0,0.5);
+    vec3 col = vec3(0.48,0.42,0.35) * (0.7+c*0.4+n*0.2);
+    float L = term(vNormal, uLightDir);
+    col *= 0.06 + L*0.9;
+    gl_FragColor=vec4(col*uBrightness,1.0);
+  }`,
+
+  triton: /* glsl */`
+  void main(){
+    vec2 uv = sphereUV(normalize(vObjPos));
+    float n = fbm2(uv*4.0,5,2.0,0.5);
+    vec3 col = mix(vec3(0.80,0.78,0.72), vec3(0.60,0.65,0.72), n);
+    // 南极冰盖
+    float lat = normalize(vObjPos).y;
+    float ice = smoothstep(-0.6,-0.4,lat)*0.0 + smoothstep(0.5,0.8,lat);
+    // 间歇泉区域微暗
+    float plume = smoothstep(0.7,0.6,abs(lat+0.7))*0.3;
+    col = mix(col, vec3(0.95,0.95,0.98), ice);
+    col -= vec3(0.1,0.08,0.05)*plume;
+    float L = term(vNormal, uLightDir);
+    col *= 0.1 + L*0.92;
+    gl_FragColor=vec4(col*uBrightness,1.0);
+  }`,
 };
 
 function makeAtmosphere(radius, color, opacity=0.35, power=3.0){

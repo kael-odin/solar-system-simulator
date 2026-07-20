@@ -1,12 +1,13 @@
 // src/ui/panels.js — 信息面板、控制面板、搜索、点击选中、双击聚焦
 import * as THREE from 'three';
 import { STATE } from '../main.js';
-import { searchBodies, findBody } from '../data/bodies.js';
+import { searchBodies, findBody, getExploration } from '../data/bodies.js';
 import { initCameraRefs, focusTarget, gotoPreset } from './camera.js';
 import { updateCamera } from './camera.js';
 import { getQualityKey, QUALITY_PRESETS } from '../quality.js';
 import { trackVisit, getUnlocked, getDefs } from './achievements.js';
 import { isRealScale, setRealScale } from '../scalemode.js';
+import { t, getLang, toggleLang, applyStaticI18N, bodyName, typeName } from './i18n.js';
 export { selectBody };
 
 let refs, bodyRegistry;
@@ -14,32 +15,42 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 function infoDefault(){
-  document.getElementById('info-name').textContent = '太阳系';
-  document.getElementById('info-en').textContent = 'Solar System';
-  document.getElementById('info-type').textContent = '系统';
+  const zh = getLang()==='zh';
+  document.getElementById('info-name').textContent = zh?'太阳系':'Solar System';
+  document.getElementById('info-en').textContent = zh?'Solar System':'太阳系';
+  document.getElementById('info-type').textContent = t('systemType');
   const unlocked = getUnlocked().length, total = getDefs().length;
   document.getElementById('info-body').innerHTML =
-    '<div class="hint">单击任意天体查看详情；双击聚焦飞行；拖拽旋转，滚轮缩放，右键平移。<br>Tab/方向键切换天体，Enter 聚焦。<br><br>🏆 成就 '+unlocked+'/'+total+'</div>';
+    '<div class="hint">'+t('hint',{u:unlocked,t:total})+'</div>';
 }
 
 function showInfo(body){
-  document.getElementById('info-name').textContent = body.name;
-  document.getElementById('info-en').textContent = body.en;
-  document.getElementById('info-type').textContent = body.type + ' · ' + (body.typeEn||'');
+  document.getElementById('info-name').textContent = bodyName(body);
+  document.getElementById('info-en').textContent = getLang()==='zh' ? body.en : body.name;
+  document.getElementById('info-type').textContent = typeName(body);
   const rows = [
-    ['直径', body.diameter ? body.diameter.toLocaleString()+' km' : '—'],
-    ['轨道半长轴', body.semiMajor ? body.semiMajor+' AU' : '—'],
-    ['自转周期', body.rotation ? body.rotation+' 地球日' : '—'],
-    ['公转周期', body.orbit ? (body.orbit>=1 ? body.orbit+' 地球年' : (body.orbit*365).toFixed(1)+' 地球日') : '—'],
-    ['表面温度', body.temp || '—'],
-    ['已知卫星', body.moons!=null ? body.moons+' 颗' : '—'],
+    [t('diameter'), body.diameter ? body.diameter.toLocaleString()+' km' : '—'],
+    [t('semiMajor'), body.semiMajor ? body.semiMajor+' AU' : '—'],
+    [t('rotation'), body.rotation ? body.rotation+' '+t('earthDay') : '—'],
+    [t('orbit'), body.orbit ? (body.orbit>=1 ? body.orbit+' '+t('earthYear') : (body.orbit*365).toFixed(1)+' '+t('earthDay')) : '—'],
+    [t('temp'), body.temp || '—'],
+    [t('moons'), body.moons!=null ? body.moons+' '+t('moonsUnit').trim() : '—'],
   ];
   // 平滑滚动动画：逐行淡入
   const html = rows.map((r,i)=>
     `<div class="row" style="opacity:0;transform:translateY(8px);animation:rowin .4s ${i*0.06}s forwards">
        <span class="k">${r[0]}</span><span class="v">${r[1]}</span>
      </div>`).join('');
-  document.getElementById('info-body').innerHTML = html + '<style>@keyframes rowin{to{opacity:1;transform:none}}</style>';
+  // 探索记录
+  const ex = getExploration(body.id);
+  let exHtml = '';
+  if(ex){
+    exHtml = `<div class="row" style="opacity:0;animation:rowin .4s ${rows.length*0.06}s forwards;display:block;text-align:left">
+       <span class="k" style="display:block;margin-bottom:4px">${t('exploration')}</span>
+       <span class="v" style="text-align:left;font-size:11.5px;line-height:1.5">${ex.visited}</span>
+     </div>`;
+  }
+  document.getElementById('info-body').innerHTML = html + exHtml + '<style>@keyframes rowin{to{opacity:1;transform:none}}</style>';
 }
 
 export function selectBody(id){
@@ -93,9 +104,9 @@ function setupSearch(){
     const q = input.value.trim();
     if(!q){ results.style.display='none'; return; }
     const list = searchBodies(q);
-    if(!list.length){ results.innerHTML='<div class="search-item">无匹配结果</div>'; results.style.display='block'; return; }
+    if(!list.length){ results.innerHTML='<div class="search-item">'+t('noResult')+'</div>'; results.style.display='block'; return; }
     results.innerHTML = list.map(b=>
-      `<div class="search-item" data-id="${b.id}">${b.name}<span class="en">${b.en} · ${b.type}</span></div>`
+      `<div class="search-item" data-id="${b.id}">${bodyName(b)}<span class="en">${getLang()==='zh'?b.en:b.name} · ${typeName(b)}</span></div>`
     ).join('');
     results.style.display='block';
   });
@@ -183,6 +194,7 @@ export function initUI(_refs){
   refs = _refs; bodyRegistry = _refs.bodyRegistry;
   initCameraRefs(_refs);
   setupSearch(); setupControls();
+  applyStaticI18N();
   infoDefault();
   // 高亮当前质量档
   const qk = getQualityKey();
@@ -191,6 +203,26 @@ export function initUI(_refs){
   const toggle = document.getElementById('panel-toggle');
   const cp = document.getElementById('control-panel');
   if(toggle && cp){ toggle.addEventListener('click', ()=> cp.classList.toggle('open')); }
+  // 语言切换
+  const langBtn = document.getElementById('lang-toggle');
+  if(langBtn){
+    langBtn.textContent = getLang()==='zh' ? 'EN' : '中';
+    langBtn.addEventListener('click', ()=>{
+      toggleLang();
+      langBtn.textContent = getLang()==='zh' ? 'EN' : '中';
+      applyStaticI18N();
+      // 刷新天体标签文本
+      if(refs.labelObjects){
+        refs.labelObjects.forEach(l=>{
+          const b = findBody(l.id);
+          if(b) l.el.textContent = bodyName(b);
+        });
+      }
+      // 刷新信息面板
+      if(STATE.selected){ const b=findBody(STATE.selected); if(b) showInfo(b); else infoDefault(); }
+      else infoDefault();
+    });
+  }
   // 注册主指针事件
   const canvas = document.getElementById('scene');
   canvas.addEventListener('pointerdown', onPointerDown);

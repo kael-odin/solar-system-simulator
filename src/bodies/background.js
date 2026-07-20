@@ -112,20 +112,45 @@ function makeMeteors(){
   return { group, meteors, spawn };
 }
 
-// 奥尔特云：极远处稀疏粒子
+// 奥尔特云：极远处稀疏粒子（软圆点，非方块）
 function makeOort(count=1500){
   const N=count;
   const pos=new Float32Array(N*3);
+  const siz=new Float32Array(N);
   for(let i=0;i<N;i++){
     const u=Math.random()*Math.PI*2, v=Math.acos(2*Math.random()-1);
     const r=5000+Math.random()*2500;
     pos[i*3]=r*Math.sin(v)*Math.cos(u);
     pos[i*3+1]=r*Math.sin(v)*Math.sin(u);
     pos[i*3+2]=r*Math.cos(v);
+    siz[i]=Math.random()*1.5+0.5;
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const m=new THREE.PointsMaterial({ color:0x8899bb, size:2, transparent:true, opacity:0.35, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:false });
+  g.setAttribute('aSize',new THREE.BufferAttribute(siz,1));
+  const m=new THREE.ShaderMaterial({
+    uniforms:{ uPixelRatio:{value:Math.min(window.devicePixelRatio,2)} },
+    vertexShader:`
+      attribute float aSize; uniform float uPixelRatio;
+      varying float vSz;
+      void main(){
+        vSz=aSize;
+        vec4 mv=modelViewMatrix*vec4(position,1.0);
+        gl_PointSize=aSize*2.0*uPixelRatio*(300.0/-mv.z);
+        gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      varying float vSz;
+      void main(){
+        vec2 d=gl_PointCoord-0.5;
+        float r=length(d);
+        float a=smoothstep(0.5,0.0,r);
+        a*=a; // 中心更亮
+        vec3 col=mix(vec3(0.55,0.65,0.85), vec3(0.85,0.88,0.95), vSz/2.0);
+        gl_FragColor=vec4(col, a*0.5);
+      }`,
+    transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
+  });
   return new THREE.Points(g,m);
 }
 

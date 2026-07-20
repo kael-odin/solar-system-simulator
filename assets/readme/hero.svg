@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="100%" role="img" aria-labelledby="t d">
+  <title id="t">电影级太阳系模拟器 · Cinematic Solar System Simulator</title>
+  <desc id="d">Three.js 全程序化太阳系模拟器：19+ 天体、真实开普勒椭圆轨道、体积日冕、单文件运行。</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="55%" r="75%">
+      <stop offset="0%" stop-color="#0a1430"/>
+      <stop offset="55%" stop-color="#050813"/>
+      <stop offset="100%" stop-color="#020309"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6d8"/>
+      <stop offset="25%" stop-color="#ffd27a"/>
+      <stop offset="55%" stop-color="#ff8a32"/>
+      <stop offset="85%" stop-color="#c8392a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#c8392a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffb060" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffb060" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring1" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#3a5a8a" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#5a82c0"/>
+      <stop offset="100%" stop-color="#3a5a8a" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="noise" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="#0a1430"/>
+      <circle cx="1" cy="2" r="0.4" fill="#6fa6ff" opacity="0.25"/>
+      <circle cx="4" cy="5" r="0.3" fill="#9fc0ff" opacity="0.18"/>
+      <circle cx="3" cy="1" r="0.25" fill="#cfdcff" opacity="0.2"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="380" fill="url(#bg)"/>
+  <rect width="1200" height="380" fill="url(#noise)" opacity="0.5"/>
+
+  <!-- 背景星点 -->
+  <g fill="#dfe8ff">
+    <circle cx="80" cy="60" r="0.8" opacity="0.7"/><circle cx="160" cy="320" r="0.6" opacity="0.5"/>
+    <circle cx="240" cy="90" r="0.9" opacity="0.8"/><circle cx="1020" cy="70" r="0.7" opacity="0.6"/>
+    <circle cx="1110" cy="300" r="0.8" opacity="0.7"/><circle cx="950" cy="340" r="0.5" opacity="0.4"/>
+    <circle cx="60" cy="200" r="0.6" opacity="0.5"/><circle cx="1150" cy="180" r="0.7" opacity="0.6"/>
+    <circle cx="40" cy="340" r="0.5" opacity="0.4"/><circle cx="1080" cy="40" r="0.6" opacity="0.5"/>
+  </g>
+
+  <!-- 轨道环 -->
+  <g fill="none" stroke-width="1">
+    <ellipse cx="600" cy="210" rx="90" ry="26" stroke="#4a6a9a" opacity="0.35"/>
+    <ellipse cx="600" cy="210" rx="150" ry="43" stroke="#4a6a9a" opacity="0.30"/>
+    <ellipse cx="600" cy="210" rx="220" ry="63" stroke="#4a6a9a" opacity="0.28"/>
+    <ellipse cx="600" cy="210" rx="310" ry="89" stroke="#4a6a9a" opacity="0.24"/>
+    <ellipse cx="600" cy="210" rx="420" ry="120" stroke="#4a6a9a" opacity="0.20"/>
+  </g>
+
+  <!-- 太阳光晕 + 太阳 -->
+  <circle cx="600" cy="210" r="120" fill="url(#halo)"/>
+  <circle cx="600" cy="210" r="46" fill="url(#sun)"/>
+
+  <!-- 行星色点（程序化外观的代表色） -->
+  <g>
+    <!-- 水星 -->
+    <circle cx="690" cy="210" r="4" fill="#9a8c7a"/>
+    <!-- 金星 -->
+    <circle cx="750" cy="210" r="6" fill="#d9b25a"/>
+    <!-- 地球 -->
+    <circle cx="820" cy="210" r="6.5" fill="#3a6fb0"/>
+    <circle cx="820" cy="210" r="6.5" fill="none" stroke="#6fa8ff" stroke-width="1.2" opacity="0.6"/>
+    <!-- 火星 -->
+    <circle cx="910" cy="210" r="5" fill="#b04a28"/>
+    <!-- 木星（带条带） -->
+    <ellipse cx="1020" cy="210" rx="14" ry="6" fill="#c8893a"/>
+    <ellipse cx="1020" cy="210" rx="14" ry="6" fill="none" stroke="#8a5a28" stroke-width="0.8" opacity="0.5"/>
+    <ellipse cx="1014" cy="213" rx="3" ry="1.4" fill="#a83322" opacity="0.85"/>
+    <!-- 土星 + 环 -->
+    <ellipse cx="600" cy="210" rx="0" ry="0"/>
+    <g transform="translate(600,210) scale(0,0)"></g>
+  </g>
+
+  <!-- 标题区（右侧叠加在负空间） -->
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif" text-rendering="geometricPrecision">
+    <text x="60" y="96" font-size="14" letter-spacing="6" fill="#6fa6ff" opacity="0.85">ASTROPHYSICS · WEBGL · PROCEDURAL</text>
+    <text x="60" y="150" font-size="46" font-weight="700" fill="#f4f8ff">电影级太阳系模拟器</text>
+    <text x="60" y="188" font-size="22" font-weight="400" fill="#9fb0d0" letter-spacing="0.5">Cinematic Solar System Simulator</text>
+    <text x="60" y="232" font-size="15" fill="#b8c6e0" opacity="0.9">Three.js 全程序化着色器 · 单文件运行 · 零外部资源</text>
+    <text x="60" y="258" font-size="15" fill="#b8c6e0" opacity="0.9">19+ 天体 · 真实开普勒椭圆轨道 · 体积日冕</text>
+    <g font-size="13" fill="#6fa6ff">
+      <text x="60" y="318" opacity="0.8">在线 demo</text>
+      <text x="180" y="318" fill="#9fb0d0" opacity="0.7">→ kael-odin.github.io/solar-system-simulator</text>
+    </g>
+  </g>
+</svg>

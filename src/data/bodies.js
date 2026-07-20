@@ -131,6 +131,17 @@ export const MOONS = [
   { id:'moon', name:'月球', en:'Moon', parent:'earth', type:'卫星', typeEn:'Moon',
     diameter:3474, semiMajor:0.0026, rotation:27.32, orbit:0.0748, temp:'-173 ~ 127 ℃', moons:0,
     renderRadius:0.4, orbitRadius:3.2, orbitSpeed:2.5, rotSpeed:0.3 },
+  // 火星卫星（已确认）
+  { id:'phobos', name:'火卫一', en:'Phobos', parent:'mars', type:'卫星', typeEn:'Moon',
+    diameter:22, semiMajor:9376e-6, rotation:0.319, orbit:0.000318, temp:'-40 ℃', moons:0,
+    renderRadius:0.12, orbitRadius:2.0, orbitSpeed:14, rotSpeed:1.0 },
+  { id:'deimos', name:'火卫二', en:'Deimos', parent:'mars', type:'卫星', typeEn:'Moon',
+    diameter:12, semiMajor:23463e-6, rotation:1.263, orbit:0.001263, temp:'-40 ℃', moons:0,
+    renderRadius:0.08, orbitRadius:3.0, orbitSpeed:6, rotSpeed:1.0 },
+  // 海王星卫星（已确认，逆行）
+  { id:'triton', name:'海卫一', en:'Triton', parent:'neptune', type:'卫星', typeEn:'Moon',
+    diameter:2707, semiMajor:0.00236, rotation:5.88, orbit:0.0161, temp:'-235 ℃', moons:0,
+    renderRadius:0.32, orbitRadius:5.5, orbitSpeed:4, rotSpeed:0.5, retrograde:true },
 ];
 
 // 标注的知名小行星
@@ -141,9 +152,45 @@ export const NAMED_ASTEROIDS = [
     diameter:512, semiMajor:2.77, rotation:0.33, orbit:4.61, temp:'-109 ℃', moons:0 },
 ];
 
+// 探测任务/探索记录（按天体 id）
+export const EXPLORATION = {
+  sun:    { visited:'无人造物抵达，帕克太阳探测器(2018)最近距约 0.04 AU', lander:false },
+  mercury:{ visited:'水手10号(1974)飞掠，信使号(2011-2015)环绕', lander:false },
+  venus:  { visited:'金星系列(苏联1961-)着陆，麦哲伦号(1990)雷达测绘', lander:true },
+  earth:  { visited:'人类家园，国际空间站持续驻留', lander:true },
+  moon:   { visited:'阿波罗11号(1969)载人登月，嫦娥五号(2020)采样返回', lander:true },
+  mars:   { visited:'维京号(1976)着陆，好奇号/毅力号巡视，天问一号(2021)祝融号', lander:true },
+  phobos: { visited:'苏联火卫一计划未成功，MMX 任务(2020s)计划采样', lander:false },
+  jupiter:{ visited:'先驱者/旅行者(1973-79)飞掠，伽利略号(1995-2003)环绕，朱诺号(2016-)', lander:false },
+  io:     { visited:'伽利略号近距离飞掠，观测到活火山', lander:false },
+  europa: { visited:'伽利略号飞掠，木卫二快船(2024发射)将多次飞掠', lander:false },
+  ganymede:{ visited:'伽利略号飞掠，JUICE(2023发射)将环绕', lander:false },
+  callisto:{ visited:'伽利略号飞掠', lander:false },
+  saturn: { visited:'先驱者11/旅行者飞掠，卡西尼号(2004-2017)环绕', lander:false },
+  titan:  { visited:'惠更斯探测器(2005)着陆于泰坦表面', lander:true },
+  enceladus:{ visited:'卡西尼号多次飞掠，发现南极冰喷泉', lander:false },
+  uranus: { visited:'旅行者2号(1986)唯一飞掠', lander:false },
+  neptune:{ visited:'旅行者2号(1989)唯一飞掠', lander:false },
+  triton: { visited:'旅行者2号(1989)飞掠，观测到间歇泉', lander:false },
+  pluto:  { visited:'新视野号(2015)飞掠，首次近距离成像', lander:false },
+  ceres:  { visited:'黎明号(2015-2018)环绕测绘', lander:false },
+  vesta:  { visited:'黎明号(2011-2012)环绕', lander:false },
+};
+
+// 已确认系外行星精选（外部已确认天体，科普展示）
+export const EXOPLANETS = [
+  { id:'proxima_b', name:'比邻星b', en:'Proxima Centauri b', star:'比邻星', distance:4.24, type:'类地候选', period:11.2, discovered:2016, habitable:'宜居带内' },
+  { id:'trappist1e', name:'特拉比斯特-1e', en:'TRAPPIST-1e', star:'TRAPPIST-1', distance:39.5, type:'类地', period:6.1, discovered:2017, habitable:'宜居带内' },
+  { id:'kepler452b', name:'开普勒-452b', en:'Kepler-452b', star:'Kepler-452', distance:1402, type:'超级地球', period:384.8, discovered:2015, habitable:'宜居带内' },
+  { id:'hd209458b', name:'HD 209458b', en:'Osiris', star:'HD 209458', distance:159, type:'热木星', period:3.52, discovered:1999, habitable:'否' },
+  { id:'51pegasi_b', name:'飞马座51b', en:'51 Pegasi b', star:'51 Pegasi', distance:50.45, type:'热木星(首颗)', period:4.23, discovered:1995, habitable:'否' },
+  { id:'gliese581g', name:'格利泽581g', en:'Gliese 581g', star:'Gliese 581', distance:20.4, type:'类地候选', period:36.6, discovered:2010, habitable:'宜居带(存疑)' },
+];
+
 export const ALL_BODIES = [SUN, ...PLANETS, ...DWARFS, ...MOONS, ...NAMED_ASTEROIDS];
 
 export function findBody(id){ return ALL_BODIES.find(b=>b.id===id); }
+export function getExploration(id){ return EXPLORATION[id]; }
 export function searchBodies(q){
   const s=q.trim().toLowerCase(); if(!s) return [];
   return ALL_BODIES.filter(b=>
