@@ -33,43 +33,47 @@ export function createSaturnRings(planetRadius){
       float h(float x){ return fract(sin(x*4217.31)*43758.5453); }
       void main(){
         float u = vUv.x; // 0 内 -> 1 外
-        // 颜色渐变：内淡黄 -> 中浅棕 -> 外淡蓝灰
-        vec3 cIn  = vec3(0.85,0.78,0.55);
-        vec3 cMid = vec3(0.72,0.60,0.42);
-        vec3 cOut = vec3(0.62,0.66,0.72);
-        vec3 col = mix(cIn, cMid, smoothstep(0.0,0.45,u));
-        col = mix(col, cOut, smoothstep(0.5,1.0,u));
-        // 多层环密度
-        float dens = 0.6;
-        dens *= smoothstep(0.0,0.05,u);          // 内缘淡入
-        dens *= 1.0 - smoothstep(0.95,1.0,u);    // 外缘淡出
-        // 卡西尼缝
-        float cassini = smoothstep(0.55,0.6,u) - smoothstep(0.6,0.65,u);
-        dens *= 1.0 - cassini*0.9;
-        // 次级缝
-        float gap2 = smoothstep(0.30,0.32,u) - smoothstep(0.32,0.34,u);
-        dens *= 1.0 - gap2*0.6;
-        // 环状条纹
-        float bands = 0.7 + 0.3*sin(u*120.0);
-        dens *= 0.7 + 0.3*bands;
-        // 粒子散射：discard 部分像素
+        // 真实土星环配色：C 环(内)暗透 → B 环亮金黄 → 卡西尼缝 → A 环浅棕 → 外缘淡灰
+        vec3 cC   = vec3(0.55,0.48,0.34); // C 环：偏暗的沙色
+        vec3 cB   = vec3(0.92,0.84,0.62); // B 环：最亮的金黄（最密）
+        vec3 cA   = vec3(0.80,0.70,0.50); // A 环：浅棕
+        vec3 cOut = vec3(0.62,0.60,0.55); // F 环外：淡灰棕
+        vec3 col = mix(cC, cB, smoothstep(0.0,0.22,u));       // C→B
+        col = mix(col, cA, smoothstep(0.45,0.55,u));          // B→A（跨卡西尼缝）
+        col = mix(col, cOut, smoothstep(0.85,1.0,u));         // A→外缘
+        // 环密度：B 环最密，内外缘淡
+        float dens = 0.55;
+        dens *= smoothstep(0.0,0.06,u);            // 内缘淡入
+        dens *= 1.0 - smoothstep(0.93,1.0,u);      // 外缘淡出
+        dens *= 1.0 + 0.5*smoothstep(0.18,0.45,u); // B 环增密
+        // 卡西尼缝（B/A 之间，约 u=0.5）
+        float cassini = smoothstep(0.46,0.50,u) - smoothstep(0.50,0.54,u);
+        dens *= 1.0 - cassini*0.92;
+        // 次级细缝
+        float gap2 = smoothstep(0.30,0.315,u) - smoothstep(0.315,0.33,u);
+        dens *= 1.0 - gap2*0.5;
+        // 环状微粒条纹（高频，模拟粒子聚集）
+        float bands = 0.6 + 0.4*sin(u*180.0);
+        dens *= 0.65 + 0.35*bands;
+        // 粒子散射：discard 部分像素造颗粒感
         float scatter = h(u*1000.0 + fract(uTime*0.1));
         if(scatter < 0.12) discard;
-        // 光照：太阳在原点，光方向 = 天体指向太阳
+        // 光照：太阳在原点，光方向 = 环点指向太阳
         vec3 toSun = normalize(-vWorldPos);
-        vec3 localP = vWorldPos;
-        // 环法线（世界空间）：环平面倾斜 0.15rad，法线近似 (sin0.15, cos0.15, 0)
+        // 环平面法线（世界空间）：环倾斜 0.15rad，法线近似 (sin0.15, cos0.15, 0)
         vec3 nrm = normalize(vec3(sin(0.15), cos(0.15), 0.0));
+        // DoubleSide：背面翻转法线，使双面光照对称，避免上下颜色割裂
+        if(!gl_FrontFacing) nrm = -nrm;
         float lambert = max(dot(nrm, toSun), 0.0);
-        // 土星本体投在环上的阴影：环点位于土星背阳侧（toSun 与径向反向）且在土星半径内
-        vec2 horiz = vec2(localP.x, localP.z);
+        // 土星本体投在环上的阴影：背阳半圆且在土星半径内
+        vec2 horiz = vec2(vWorldPos.x, vWorldPos.z);
         float radialDot = dot(normalize(horiz), normalize(toSun.xz));
-        float inShadowCone = smoothstep(0.0, 0.2, -radialDot);      // 背阳半圆
+        float inShadowCone = smoothstep(0.0, 0.2, -radialDot);
         float withinRadius = 1.0 - smoothstep(uSaturnRadius*0.9, uSaturnRadius*1.6, length(horiz));
-        float shadow = inShadowCone * withinRadius * 0.75;
-        // 明暗：向阳面亮、背阳面暗但非纯黑，叠加土星阴影
-        float lit = mix(0.35, 1.0, lambert) * (1.0 - shadow);
-        float alpha = dens * 0.9;
+        float shadow = inShadowCone * withinRadius * 0.78;
+        // 明暗：向阳 1.0、背阳 0.42（非纯黑），叠加土星阴影
+        float lit = mix(0.42, 1.0, lambert) * (1.0 - shadow);
+        float alpha = dens * 0.92;
         gl_FragColor = vec4(col * uBrightness * lit, alpha);
       }`,
     transparent:true, side:THREE.DoubleSide, depthWrite:false,
