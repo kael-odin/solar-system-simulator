@@ -1,9 +1,12 @@
 // src/bodies/saturnRings.js — 土星环：多层半透明 + 卡西尼缝 + discard 粒子散射 + 内外色彩渐变
 import * as THREE from 'three';
+import { isRealScale } from '../scalemode.js';
 
 export function createSaturnRings(planetRadius){
-  const innerR = planetRadius * 1.4;
-  const outerR = planetRadius * 2.4;
+  // 真实尺度下距离被对数压扁，环按观感倍率会切到邻星轨道，收紧环径比。
+  const k = isRealScale() ? { inner:1.25, outer:1.75 } : { inner:1.4, outer:2.4 };
+  const innerR = planetRadius * k.inner;
+  const outerR = planetRadius * k.outer;
   const geo = new THREE.RingGeometry(innerR, outerR, 128, 8);
   // 修正 UV：默认 RingGeometry 的 uv 不便按径向计算，自定义 attribute
   const pos = geo.attributes.position;

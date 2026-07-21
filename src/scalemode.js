@@ -14,9 +14,12 @@ export function realRenderRadius(diameterKm){
   return Math.max(0.3, Math.log10(diameterKm/100) * 0.9);
 }
 // 由真实半长轴(AU)计算渲染轨道半径
+// ponytail: 距离对数压缩——真实比例下土星到海王星会撑爆屏幕，但环半径也要跟着缩，
+// 否则环 outer 会越过邻星轨道（土星环切天王星）。环倍率在 saturnRings.js 收紧配套。
 export function realOrbitRadius(semiMajorAU){
   if(!semiMajorAU) return 10;
-  return Math.max(10, Math.log10(semiMajorAU*9.5 + 1) * 22);
+  // 指数根压扁近行星、拉开远行星，保留"越远越大"相对关系
+  return Math.max(10, Math.pow(semiMajorAU, 0.62) * 17);
 }
 
 // 给 data 注入 real-scale 渲染值（若开启）

@@ -11,6 +11,7 @@ import { createPlanet } from './bodies/planet.js';
 import { createMoon } from './bodies/moon.js';
 import { createDwarf } from './bodies/dwarf.js';
 import { createSaturnRings } from './bodies/saturnRings.js';
+import { applyScaleMode } from './scalemode.js';
 import { createAsteroidBelt, createKuiperBelt, createOortCloud, updateAsteroidBelt, updateKuiperBelt } from './bodies/belts.js';
 import { createBackground } from './bodies/background.js';
 import { SUN, PLANETS, DWARFS, MOONS, NAMED_ASTEROIDS, findBody } from './data/bodies.js';
@@ -117,7 +118,7 @@ for(const p of PLANETS){
   bodyRegistry.set(p.id, po); planetObjs[p.id]=po;
   addLabel(bodyName(p), po.group, p.id);
   const orbit = makeEllipseOrbit(p); orbitGroup.add(orbit); po.orbitLine = orbit;
-  if(p.id==='saturn'){ const rings = createSaturnRings(3.8); po.group.add(rings); }
+  if(p.id==='saturn'){ const rings = createSaturnRings(applyScaleMode(p).renderRadius); po.group.add(rings); }
 }
 
 const moonObjs = {};
