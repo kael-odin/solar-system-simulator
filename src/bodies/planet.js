@@ -96,14 +96,14 @@ const SHADERS = {
     if(isSea>0.5){
       spec = pow(max(dot(normalize(vNormal),normalize(uLightDir)),0.0),80.0)*0.6;
     }
-    // 夜灯（夜面城市灯光）
+    // 夜灯（夜面城市灯光）——在光照压暗后叠加，避免被夜面兰伯特系数抹掉
     float night = 1.0 - term(vNormal, uLightDir);
-    if(isSea<0.5){
-      float city = step(0.6, fbm2(uv*12.0,4,2.0,0.5));
-      col += vec3(1.0,0.8,0.4)*city*night*0.8;
-    }
     float L = term(vNormal, uLightDir);
     col *= 0.12 + L*0.95;
+    if(isSea<0.5){
+      float city = step(0.6, fbm2(uv*12.0,4,2.0,0.5));
+      col += vec3(1.0,0.8,0.4)*city*night*0.9;
+    }
     col += vec3(1.0,0.95,0.8)*spec*0.3;
     gl_FragColor=vec4(col*uBrightness,1.0);
   }`,
