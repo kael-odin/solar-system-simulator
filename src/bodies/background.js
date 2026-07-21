@@ -65,7 +65,7 @@ function makeStarfield(count=8000){
         vTw = tw;
         // 密度：按 hash 丢弃一部分
         float keep = step(1.0-uDensity, fract(aPhase*7.31));
-        gl_PointSize = aSize * (300.0/-(modelViewMatrix*vec4(position,1.0)).z) * tw;
+        gl_PointSize = max(1.5, aSize * (300.0/-(modelViewMatrix*vec4(position,1.0)).z) * tw);
         gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
         gl_Position = keep>0.5 ? gl_Position : vec4(2.0,2.0,2.0,1.0); // 移出屏幕
       }`,
@@ -73,8 +73,11 @@ function makeStarfield(count=8000){
       varying vec3 vColor; varying float vTw;
       void main(){
         vec2 d = gl_PointCoord-0.5;
-        float a = smoothstep(0.5,0.0,length(d));
-        gl_FragColor=vec4(vColor*vTw, a);
+        float r = length(d);
+        // 高斯软核 + 中心亮点，避免远距亚像素退化成硬方块
+        float a = exp(-r*r*8.0);
+        float core = smoothstep(0.18,0.0,r);
+        gl_FragColor=vec4(vColor*(vTw+core*0.6), a);
       }`,
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
   });
@@ -136,7 +139,7 @@ function makeOort(count=1500){
       void main(){
         vSz=aSize;
         vec4 mv=modelViewMatrix*vec4(position,1.0);
-        gl_PointSize=aSize*2.0*uPixelRatio*(300.0/-mv.z);
+        gl_PointSize=max(1.5, aSize*2.0*uPixelRatio*(300.0/-mv.z));
         gl_Position=projectionMatrix*mv;
       }`,
     fragmentShader:`

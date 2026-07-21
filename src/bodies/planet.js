@@ -145,8 +145,6 @@ const SHADERS = {
     col = mix(col, cRed, smoothstep(0.6,0.78,t));
     col = mix(col, vec3(warp*0.15), 0.2);
     // 大红斑：赤道附近椭圆涡旋
-    vec2 rsp = vec2(sp.x, sp.y*1.6); // 椭圆
-    float dr = rsp.x*0.6 + rsp.y*0.8; // 椭圆距离修正
     vec2 center = vec2(0.0, -0.25);
     float d = length(vec2(sp.x*1.3, (sp.y+0.25)*1.8));
     // 螺旋边缘

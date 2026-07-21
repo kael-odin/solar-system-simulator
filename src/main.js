@@ -236,8 +236,8 @@ function animate(){
     fpsEl.textContent = 'FPS: '+fps;
     fpsCount=0; fpsLast=now;
   }
-  // 日期推进：1x 倍率约等于每秒 7 天（一年看约 5 分钟），倍率 0 停
-  simDays += dt * STATE.timeScale * 7;
+  // 日期推进：1x 倍率约等于每秒 7 天（一年看约 5 分钟），倍率 0 停；方向反转则日期倒走
+  simDays += dt * STATE.timeScale * 7 * STATE.direction;
   if(dateEl){
     const d = new Date(EPOCH.getTime() + simDays*86400000);
     const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), dd=String(d.getUTCDate()).padStart(2,'0');
