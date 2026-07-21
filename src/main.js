@@ -118,7 +118,7 @@ for(const p of PLANETS){
   bodyRegistry.set(p.id, po); planetObjs[p.id]=po;
   addLabel(bodyName(p), po.group, p.id);
   const orbit = makeEllipseOrbit(p); orbitGroup.add(orbit); po.orbitLine = orbit;
-  if(p.id==='saturn'){ const rings = createSaturnRings(applyScaleMode(p).renderRadius); po.group.add(rings); }
+  if(p.id==='saturn'){ const rings = createSaturnRings(applyScaleMode(p).renderRadius); po.group.add(rings); po.rings = rings; }
 }
 
 const moonObjs = {};
@@ -191,6 +191,7 @@ function animate(){
     if(po.mesh) po.mesh.rotation.y = t * p.rotSpeed * 0.3;
     if(po.atmosphere) po.atmosphere.rotation.y = t * p.rotSpeed * 0.25;
     if(po.update) po.update(t, dt);
+    if(p.id==='saturn' && po.rings){ const u=po.rings.material.uniforms; u.uTime.value=t; u.uBrightness.value=STATE.brightness; }
   }
   // 月球
   for(const m of MOONS){

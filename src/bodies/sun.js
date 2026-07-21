@@ -64,22 +64,13 @@ function makeFlareTexture(){
   const s = 256, c = document.createElement('canvas'); c.width=c.height=s;
   const ctx = c.getContext('2d');
   const cx=s/2, cy=s/2;
-  // 中心辉光
-  const g = ctx.createRadialGradient(cx,cy,0,cx,cy,s*0.18);
-  g.addColorStop(0,'rgba(255,240,200,0.9)');
-  g.addColorStop(1,'rgba(255,200,120,0)');
+  // 柔和圆形辉光：仅径向渐变，无十字射线，避免廉价感
+  const g = ctx.createRadialGradient(cx,cy,0,cx,cy,s*0.5);
+  g.addColorStop(0,'rgba(255,242,210,0.95)');
+  g.addColorStop(0.25,'rgba(255,220,150,0.55)');
+  g.addColorStop(0.6,'rgba(255,190,110,0.15)');
+  g.addColorStop(1,'rgba(255,180,100,0)');
   ctx.fillStyle=g; ctx.fillRect(0,0,s,s);
-  // 十字光芒
-  ctx.globalCompositeOperation='lighter';
-  for(const [dx,dy] of [[1,0],[0,1],[1,1],[1,-1]]){
-    ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.atan2(dy,dx));
-    const grad = ctx.createLinearGradient(-s*0.5,0,s*0.5,0);
-    grad.addColorStop(0,'rgba(255,220,150,0)');
-    grad.addColorStop(0.5,'rgba(255,235,180,0.5)');
-    grad.addColorStop(1,'rgba(255,220,150,0)');
-    ctx.fillStyle=grad; ctx.fillRect(-s*0.5,-1.5,s,3);
-    ctx.restore();
-  }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }

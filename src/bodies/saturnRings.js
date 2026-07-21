@@ -17,12 +17,18 @@ export function createSaturnRings(planetRadius){
     uv.setXY(i, (r-innerR)/(outerR-innerR), 0);
   }
   const mat = new THREE.ShaderMaterial({
-    uniforms:{ uTime:{value:0}, uBrightness:{value:1.0} },
+    uniforms:{ uTime:{value:0}, uBrightness:{value:1.0}, uSaturnRadius:{value:planetRadius} },
     vertexShader:`
-      varying vec2 vUv; varying vec3 vPos;
-      void main(){ vUv=uv; vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      varying vec2 vUv; varying vec3 vPos; varying vec3 vWorldPos;
+      void main(){
+        vUv=uv; vPos=position;
+        vec4 wp = modelMatrix * vec4(position,1.0);
+        vWorldPos = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
     fragmentShader:`
-      varying vec2 vUv; varying vec3 vPos; uniform float uTime; uniform float uBrightness;
+      varying vec2 vUv; varying vec3 vPos; varying vec3 vWorldPos;
+      uniform float uTime; uniform float uBrightness; uniform float uSaturnRadius;
       // hash for particle scatter
       float h(float x){ return fract(sin(x*4217.31)*43758.5453); }
       void main(){
@@ -49,9 +55,22 @@ export function createSaturnRings(planetRadius){
         // 粒子散射：discard 部分像素
         float scatter = h(u*1000.0 + fract(uTime*0.1));
         if(scatter < 0.12) discard;
-        // 边缘菲涅尔
+        // 光照：太阳在原点，光方向 = 天体指向太阳
+        vec3 toSun = normalize(-vWorldPos);
+        vec3 localP = vWorldPos;
+        // 环法线（世界空间）：环平面倾斜 0.15rad，法线近似 (sin0.15, cos0.15, 0)
+        vec3 nrm = normalize(vec3(sin(0.15), cos(0.15), 0.0));
+        float lambert = max(dot(nrm, toSun), 0.0);
+        // 土星本体投在环上的阴影：环点位于土星背阳侧（toSun 与径向反向）且在土星半径内
+        vec2 horiz = vec2(localP.x, localP.z);
+        float radialDot = dot(normalize(horiz), normalize(toSun.xz));
+        float inShadowCone = smoothstep(0.0, 0.2, -radialDot);      // 背阳半圆
+        float withinRadius = 1.0 - smoothstep(uSaturnRadius*0.9, uSaturnRadius*1.6, length(horiz));
+        float shadow = inShadowCone * withinRadius * 0.75;
+        // 明暗：向阳面亮、背阳面暗但非纯黑，叠加土星阴影
+        float lit = mix(0.35, 1.0, lambert) * (1.0 - shadow);
         float alpha = dens * 0.9;
-        gl_FragColor = vec4(col*uBrightness, alpha);
+        gl_FragColor = vec4(col * uBrightness * lit, alpha);
       }`,
     transparent:true, side:THREE.DoubleSide, depthWrite:false,
   });
