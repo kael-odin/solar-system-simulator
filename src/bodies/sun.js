@@ -59,7 +59,7 @@ void main(){
 }
 `;
 
-// 镜头光晕纹理：十字光芒 + 中心辉光
+// 镜头光晕纹理：柔和圆形径向辉光
 function makeFlareTexture(){
   const s = 256, c = document.createElement('canvas'); c.width=c.height=s;
   const ctx = c.getContext('2d');
@@ -175,7 +175,7 @@ export function createSun(){
   const corona = new THREE.Mesh(coronaGeo, coronaMat);
   group.add(corona);
 
-  // 镜头光晕：十字光芒 sprite（程序化纹理）
+  // 镜头光晕：柔和圆形 sprite（程序化纹理）
   const flareTex = makeFlareTexture();
   const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map:flareTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.6 }));
   flare.scale.set(radius*10, radius*10, 1);
