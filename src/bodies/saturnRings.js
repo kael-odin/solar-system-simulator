@@ -60,19 +60,19 @@ export function createSaturnRings(planetRadius){
         if(scatter < 0.12) discard;
         // 光照：太阳在原点，光方向 = 环点指向太阳
         vec3 toSun = normalize(-vWorldPos);
-        // 环平面法线（世界空间）：环倾斜 0.15rad，法线近似 (sin0.15, cos0.15, 0)
+        // 环法线（世界空间）：环倾斜 0.15rad，法线近似 (sin0.15, cos0.15, 0)
         vec3 nrm = normalize(vec3(sin(0.15), cos(0.15), 0.0));
-        // DoubleSide：背面翻转法线，使双面光照对称，避免上下颜色割裂
-        if(!gl_FrontFacing) nrm = -nrm;
-        float lambert = max(dot(nrm, toSun), 0.0);
+        // 环是平面颗粒层，亮度正比于太阳穿过环平面的量 = |dot(nrm, toSun)|
+        // 法线⊥太阳时环边缘对日（暗），法线∥太阳时环正对日（亮）。用绝对值让双面对称。
+        float facing = abs(dot(nrm, toSun));
+        float lit = mix(0.35, 1.0, facing);
         // 土星本体投在环上的阴影：背阳半圆且在土星半径内
         vec2 horiz = vec2(vWorldPos.x, vWorldPos.z);
         float radialDot = dot(normalize(horiz), normalize(toSun.xz));
         float inShadowCone = smoothstep(0.0, 0.2, -radialDot);
         float withinRadius = 1.0 - smoothstep(uSaturnRadius*0.9, uSaturnRadius*1.6, length(horiz));
         float shadow = inShadowCone * withinRadius * 0.78;
-        // 明暗：向阳 1.0、背阳 0.42（非纯黑），叠加土星阴影
-        float lit = mix(0.42, 1.0, lambert) * (1.0 - shadow);
+        lit *= (1.0 - shadow);
         float alpha = dens * 0.92;
         gl_FragColor = vec4(col * uBrightness * lit, alpha);
       }`,

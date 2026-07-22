@@ -14,20 +14,21 @@ export function realRenderRadius(diameterKm){
   return Math.max(0.3, Math.log10(diameterKm/100) * 0.9);
 }
 // 由真实半长轴(AU)计算渲染轨道半径
-// ponytail: 距离对数压缩——真实比例下土星到海王星会撑爆屏幕，但环半径也要跟着缩，
-// 否则环 outer 会越过邻星轨道（土星环切天王星）。环倍率在 saturnRings.js 收紧配套。
-export function realOrbitRadius(semiMajorAU){
+// ponytail: 距离幂律压缩——真实线性比例下海王星(30AU)是水星(0.39AU)的77倍，
+// 屏幕装不下。平方根压缩(p=0.5)把比例压到5.5倍，保留"越远越大"且让外行星不再挤成一团。
+// 真实尺度模式用 p=1.0（线性），观感用 p=0.5。
+export function realOrbitRadius(semiMajorAU, p=0.5){
   if(!semiMajorAU) return 10;
-  // 指数根压扁近行星、拉开远行星，保留"越远越大"相对关系
-  return Math.max(10, Math.pow(semiMajorAU, 0.62) * 17);
+  return Math.max(10, Math.pow(semiMajorAU, p) * 26);
 }
 
-// 给 data 注入 real-scale 渲染值（若开启）
+// 给 data 注入渲染值：真实模式线性距离+对数半径；观感模式平方根距离+观感半径
+// 卫星无 semiMajor（不绕日），保留其原 orbitRadius 不动
 export function applyScaleMode(data){
-  if(!_real) return data;
+  const p = _real ? 1.0 : 0.5;
   return {
     ...data,
-    renderRadius: realRenderRadius(data.diameter),
-    orbitRadius: realOrbitRadius(data.semiMajor),
+    renderRadius: _real ? realRenderRadius(data.diameter) : data.renderRadius,
+    orbitRadius: data.semiMajor ? realOrbitRadius(data.semiMajor, p) : data.orbitRadius,
   };
 }
