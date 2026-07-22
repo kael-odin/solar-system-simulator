@@ -2,6 +2,11 @@
 import * as THREE from 'three';
 import { NAMED_ASTEROIDS } from '../data/bodies.js';
 import { getQuality } from '../quality.js';
+import { realOrbitRadius, isRealScale } from '../scalemode.js';
+
+// 带半径跟 scalemode 联动：用真实 AU 经同一压缩函数，保证与行星轨道在同一坐标系
+// 小行星带 2.1-3.3 AU（火木之间），柯伊伯带 30-55 AU（海王星外）
+const beltR = (auMin, auMax, p)=> realOrbitRadius(auMin, p) + Math.random()*(realOrbitRadius(auMax, p)-realOrbitRadius(auMin, p));
 
 // 不规则小行星：对球体顶点随机扰动
 function makeAsteroidGeo(radius, seed){
@@ -33,9 +38,10 @@ export function createAsteroidBelt(){
   const instanced = new THREE.InstancedMesh(makeAsteroidGeo(0.12, 1), mat, N);
   const dummy = new THREE.Object3D();
   const data = [];
+  const p = isRealScale() ? 1.0 : 0.5;
   for(let i=0;i<N;i++){
     const a = Math.random()*Math.PI*2;
-    const r = 36 + Math.random()*8; // 火星(34)与木星(50)之间
+    const r = beltR(2.1, 3.3, p); // 火星(1.52)与木星(5.2)之间真实AU
     const incl = (Math.random()-0.5)*0.5;   // 倾角
     const ecc = 1 + (Math.random()-0.5)*0.1; // 偏心率
     const scale = 0.3 + Math.random()*1.5;
@@ -59,7 +65,7 @@ export function createAsteroidBelt(){
     if(na.id==='vesta') g.scale(1,0.85,1);
     const m = new THREE.MeshStandardMaterial({ color: na.id==='vesta'?0xb0a090:0x6a5a4a, roughness:0.9, flatShading:true });
     const mesh = new THREE.Mesh(g,m);
-    mesh.userData = { bodyId: na.id, isNamed:true, orbitR: 38+Math.random()*4, phase:Math.random()*Math.PI*2, speed:0.1, incl:(Math.random()-0.5)*0.3 };
+    mesh.userData = { bodyId: na.id, isNamed:true, orbitR: beltR(2.2,3.0,p), phase:Math.random()*Math.PI*2, speed:0.1, incl:(Math.random()-0.5)*0.3 };
     named.push(mesh); group.add(mesh);
   }
 
@@ -94,9 +100,10 @@ export function createKuiperBelt(){
   const N = Q.kuiperCount;
   const pos = new Float32Array(N*3);
   const col = new Float32Array(N*3);
+  const p = isRealScale() ? 1.0 : 0.5;
   for(let i=0;i<N;i++){
     const a = Math.random()*Math.PI*2;
-    const r = 95 + Math.random()*25; // 海王星(92)外
+    const r = beltR(32, 55, p); // 海王星(30AU)外，冥王星/阋神星在带内
     const incl = (Math.random()-0.5)*0.6;
     pos[i*3]=Math.cos(a)*r;
     pos[i*3+1]=Math.sin(a)*incl*0.5;
